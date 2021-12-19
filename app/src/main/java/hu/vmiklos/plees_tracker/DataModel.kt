@@ -120,6 +120,10 @@ object DataModel {
         return database.sleepDao().getAll()
     }
 
+    suspend fun deleteSleeps(sleepList: List<Sleep>) {
+        database.sleepDao().delete(sleepList)
+    }
+
     suspend fun getSleepById(sid: Int): Sleep {
         return database.sleepDao().getById(sid)
     }
@@ -279,6 +283,49 @@ object DataModel {
         val duration = Toast.LENGTH_SHORT
         val toast = Toast.makeText(context, text, duration)
         toast.show()
+    }
+
+    private suspend fun mergeOverlappingSleeps() {
+        val sleeps = database.sleepDao().getAll()
+        val (newSleeps, oldSleeps) = getOverlappingSleeps(sleeps)
+        deleteSleeps(oldSleeps)
+        insertSleeps(newSleeps)
+    }
+
+    /**
+     * Returns a pair of lists:
+     * The first list consists of the new merged-into sleeps,
+     * the second list has the sleeps which got merged.
+     *
+     * Note that neither sleepList nor the merged sleeps are modified.
+     */
+    private fun getOverlappingSleeps(sleepsList: List<Sleep>): Pair<List<Sleep>, List<Sleep>> {
+        // These should be inserted somewhere.
+        val newSleeps = mutableListOf<Sleep>()
+        // These should be removed somewhere.
+        val mergedSleeps = mutableListOf<Sleep>()
+        val sleeps = sleepsList.sortedBy { it.start }.toMutableList()
+        for (i in 0 until sleeps.size - 1) {
+            if (mergedSleeps.contains(sleeps[i])) {
+                continue
+            }
+            val currentMergedSleeps = mutableListOf(sleeps[i])
+            for (j in i + 1 until sleeps.size) {
+                if (sleeps[i].stop < sleeps[j].start) {
+                    break
+                }
+                if (sleeps[i].overlaps(sleeps[j])) {
+                    print(listOf(sleeps[i], sleeps[j]))
+                    sleeps[i] = sleeps[i].merge(sleeps[j])
+                    currentMergedSleeps.add(sleeps[j])
+                }
+            }
+            if (currentMergedSleeps.count() > 1) {
+                newSleeps.add(sleeps[i])
+                mergedSleeps.addAll(currentMergedSleeps)
+            }
+        }
+        return Pair(newSleeps, mergedSleeps)
     }
 
     private const val TAG = "DataModel"
