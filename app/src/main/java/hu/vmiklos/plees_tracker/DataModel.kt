@@ -92,7 +92,7 @@ object DataModel {
         stop?.let {
             sleep.stop = it.time
         }
-        database.sleepDao().insert(sleep)
+        insertSleep(sleep)
 
         // Drop start timestamp from preferences, it's in the database now.
         val editor = preferences.edit()
@@ -114,6 +114,10 @@ object DataModel {
 
     suspend fun deleteSleep(sleep: Sleep) {
         database.sleepDao().delete(sleep)
+    }
+
+    suspend fun getSleeps(): List<Sleep> {
+        return database.sleepDao().getAll()
     }
 
     suspend fun getSleepById(sid: Int): Sleep {
@@ -153,9 +157,9 @@ object DataModel {
                 }
                 importedSleeps.add(sleep)
             }
-            val oldSleeps = database.sleepDao().getAll()
+            val oldSleeps = getSleeps()
             val newSleeps = importedSleeps.subtract(oldSleeps)
-            database.sleepDao().insert(newSleeps.toList())
+            insertSleeps(newSleeps.toList())
         } catch (e: IOException) {
             Log.e(TAG, "importData: readLine() failed")
             return
@@ -179,7 +183,7 @@ object DataModel {
         var importedSleeps = CalendarImport.queryForEvents(
             context, calendarId
         ).map(CalendarImport::mapEventToSleep)
-        val oldSleeps = database.sleepDao().getAll()
+        val oldSleeps = getSleeps()
         val newSleeps = importedSleeps.subtract(oldSleeps)
 
         // Insert the list of Sleep into DB
@@ -196,7 +200,7 @@ object DataModel {
         val calendarSleeps = CalendarImport.queryForEvents(
             context, calendarId
         ).map(CalendarImport::mapEventToSleep)
-        val sleeps = database.sleepDao().getAll()
+        val sleeps = getSleeps()
         val exportedSleeps = sleeps.subtract(calendarSleeps)
 
         CalendarExport.exportSleep(context, calendarId, exportedSleeps.toList())
@@ -236,7 +240,7 @@ object DataModel {
         uri: Uri,
         showToast: Boolean
     ) {
-        val sleeps = database.sleepDao().getAll()
+        val sleeps = getSleeps()
 
         try {
             cr.takePersistableUriPermission(
